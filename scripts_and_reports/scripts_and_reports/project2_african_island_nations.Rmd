@@ -4,7 +4,7 @@ author: "Jyoti Dalal, jyotidalal20@gmail.com"
 output: html_document
 ---
 
-In this project, we used the publicly available COVID-19 data on daily cases and deaths, from the WHO dashboard. Data file could also be downloaded from https://github.com/JyotiDalal93/COVID-19_SSA/blob/main/data_6_country.csv
+In this project, we used the publicly available COVID-19 data on daily cases and deaths, from the WHO dashboard. Data file could also be downloaded from https://github.com/JyotiDalal93/COVID-19_SSA/blob/main/data/project2_data_6_country.csv
 
 For more information about this project: https://osf.io/xmqac/
 
