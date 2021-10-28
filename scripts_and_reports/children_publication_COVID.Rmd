@@ -1,0 +1,616 @@
+---
+title: 'All the R scripts used to make graphs/tables for https://www.sciencedirect.com/science/article/pii/S1201971221006160'
+author: 'Jyoti Dalal'
+output: html_document
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message=F, echo = F, warning = F, dpi = 300)
+
+```
+
+We had ACCESS to the precious individual-level/patient-level data from several member states comprising the WHO African region. Using this data, we tried to get an insight into the impact of COVID-19 among children, in 15 sub-Saharan African nations.
+
+For more information: https://www.sciencedirect.com/science/article/pii/S1201971221006160
+
+```{r, include=FALSE}
+rm(list = ls())
+library(pacman) # loading all the required packages
+
+p_load(char=c("lattice","ggplot2","highr", "stringr", "markdown", 
+              "knitr", "mime", "rmarkdown","reactable", "reshape",
+              "tidyverse", "ggrepel", "lubridate", "sf","incidence",
+              "magrittr", "ggspatial", "RColorBrewer", "gridExtra","zoo","readxl"))
+```
+
+
+```{r, include=FALSE}
+# com_data = NULL
+# lines <- list()
+# countries_csv <- list.files("~/publication-children/data") # listing all data files
+# countries_names <- str_trim(str_remove(countries_csv, "_clean.csv"), "both") # extracting country names from data files
+# 
+# calculating_case_deaths = function(data, gender) # to compute confirmed cases + 
+#   #deaths in various age_groups
+# {
+#   return(data %>% filter(patinfo_sex == gender) %>%
+#            group_by(country, "gender" = patinfo_sex, "age groups" = age_cat) %>% 
+#            summarise(confirmed_cases_each_group = n(), 
+#                      confirmed_deaths_each_group = sum(death, na.rm = T))
+#   )
+# }
+# 
+# fetching_data = function(df, country)
+# {
+#   return(mutate(df, country = str_to_sentence(country), patinfo_ageonset_years = as.double(patinfo_ageonset_years),
+#                 #patinfo_ID = as.character(patinfo_ID), 
+#                 patcourse_datedeath = as.Date(patcourse_datedeath), report_classif = toupper(as.character(report_classif)), patcourse_status = toupper(as.character(patcourse_status))) %>%
+#            mutate(report_date = if_else(is.na(report_date), as.Date(Lab_resdate), as.Date(report_date) )) %>%
+#            mutate(report_date = if_else(is.na(report_date), as.Date(consultation_dateHF), as.Date(report_date) )) %>%
+#            mutate(report_date = if_else(is.na(report_date), as.Date(Lab_datetaken), as.Date(report_date) )) %>%
+#            mutate(report_date = if_else(is.na(report_date), as.Date(patcourse_dateonset), as.Date(report_date) )) %>%
+#            mutate(report_date = if_else(is.na(report_date), as.Date(patcourse_datedeath), as.Date(report_date) )) %>%
+#            mutate(report_date = if_else(is.na(report_date), as.Date(patcourse_datedischarge), as.Date(report_date) ))%>%
+#            mutate(patcourse_status = if_else((patcourse_status=='ALIVE' | patcourse_status== 'RECOVERED') & !is.na(patcourse_datedeath), 'DEAD', patcourse_status)) %>%
+#            mutate(patcourse_status = if_else(is.na(patcourse_status) & !is.na(patcourse_datedeath), 'DEAD', patcourse_status)) %>%
+#            mutate(patcourse_status = if_else(is.na(patcourse_status) & !is.na(patcourse_datedischarge), 'RECOVERED', patcourse_status)) %>%
+#            mutate(report_classif = if_else(is.na(report_classif) & (sum(is.na(report_classif))==nrow(df)), 'CONFIRMED', report_classif)) %>%
+#            mutate(death = if_else(patcourse_status=='DEAD', 1, 0))%>%
+#            mutate(
+#              age_cat = cut(patinfo_ageonset_years, c(-1,4,11,17, 150), 
+#                            labels=c("0-4", "5-11","12-17", "17+"))) %>%
+#            filter(report_date <=lubridate::ymd("2020-09-01") & report_date >=lubridate::ymd("2020-04-01"))%>%
+#            filter(report_classif=='CONFIRMED') %>% 
+#            filter(!is.na(patinfo_sex))) %>%
+#     select(country, report_date, patinfo_sex, patinfo_ageonset_years, death, 
+#            age_cat, report_classif, patcourse_status)
+# }
+# # Reading the data set
+# lines <- list()
+# for (country in countries_names){
+#   print(country)
+#   lines[country] <- readLines(paste("~/publication-children/data/",country, "_clean.csv", sep =''), n = 1)
+#   #lines[country] <- readLines(here("child_pub/data_analy", glue('{country}_clean.csv')), n = 1)
+#   
+#   #******* reading the CSVs *********#
+#   
+#   if(grepl(',', lines[country])){
+#     print(country)
+#     print("1")
+#     data1 <- as.data.frame(read.csv(paste("~/publication-children/data/", country, "_clean.csv", sep ='')),na.strings =
+#                              ".") # , separated
+#     print(country)}
+#   else {
+#     print(country)
+#     print("2")
+#     data1 <- as.data.frame(read.csv2(paste("~/publication-children/data/", country, "_clean.csv", sep ='')), na.strings =
+#                              ".") #} # , separated
+#     print(country)}
+#   
+#   data = fetching_data(data1, country) # only CONFIRMED cases
+#   
+#   #****** CONFIRMED cases + deaths in various age-groups ********#
+#   
+#   m_data = calculating_case_deaths(data, 'M') # in males
+#   f_data = calculating_case_deaths(data, 'F') # in females
+#   com_data = rbind.data.frame(com_data, m_data, f_data) 
+# }
+```
+ 
+```{r, include=FALSE}
+
+df_com = NULL
+lines <- list()
+countries_csv <- list.files("~/publication-children/data") # listing all data files; 
+countries_names <- str_trim(str_remove(countries_csv, "_clean.csv"), "both") # extracting country names from data files
+
+fetching_data = function(df, country)
+{
+  return(mutate(df, country = str_to_sentence(country), patinfo_ageonset_years = as.double(patinfo_ageonset_years),
+                patcourse_datedeath = as.Date(patcourse_datedeath), report_classif = toupper(as.character(report_classif)),  
+                patcourse_status = toupper(as.character(patcourse_status))) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(Lab_resdate), as.Date(report_date) )) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(consultation_dateHF), as.Date(report_date) )) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(Lab_datetaken), as.Date(report_date) )) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(patcourse_dateonset), as.Date(report_date) )) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(patcourse_datedeath), as.Date(report_date) )) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(patcourse_datedischarge), as.Date(report_date) ))%>%
+           mutate(patcourse_status = if_else((patcourse_status=='ALIVE' | patcourse_status== 'RECOVERED') & !is.na(patcourse_datedeath), 'DEAD', patcourse_status)) %>%
+           mutate(patcourse_status = if_else(is.na(patcourse_status) & !is.na(patcourse_datedeath), 'DEAD', patcourse_status)) %>%
+           mutate(patcourse_status = if_else(is.na(patcourse_status) & !is.na(patcourse_datedischarge), 'RECOVERED', patcourse_status)) %>%
+           mutate(report_classif = if_else(is.na(report_classif) & (sum(is.na(report_classif))==nrow(df)), 'CONFIRMED', report_classif)) %>%
+           mutate(death = if_else(patcourse_status=='DEAD', 1, 0))%>%
+           mutate(
+             age_cat = cut(patinfo_ageonset_years, c(-1,4,11,17, 150), 
+                           labels=c("0-4", "5-11","12-17", "17+"))) %>%
+           filter(report_date <=lubridate::ymd("2020-09-01") & report_date >=lubridate::ymd("2020-04-01"))%>%
+           filter(report_classif=='CONFIRMED') %>% filter(!is.na(patinfo_ageonset_years)) %>% filter(!is.na(patinfo_sex)))  %>%
+    select(country, report_date, patinfo_sex, patinfo_ageonset_years, death, 
+           age_cat, report_classif, patinfo_sex, patcourse_status)
+}
+# Reading the data set
+lines <- list()
+for (country in countries_names){
+  print(country)
+  lines[country] <- readLines(paste("~/publication-children/data/",country, "_clean.csv", sep =''), n = 1)
+  #lines[country] <- readLines(here("child_pub/data_analy", glue('{country}_clean.csv')), n = 1)
+  
+  #******* reading the CSVs *********#
+  
+  if(grepl(',', lines[country])){
+    print(country)
+    print("1")
+    data1 <- as.data.frame(read.csv(paste("~/publication-children/data/", country, "_clean.csv", sep ='')),na.strings =
+                             ".") # , separated
+    print(country)}
+  else {
+    print(country)
+    print("2")
+    data1 <- as.data.frame(read.csv2(paste("~/publication-children/data/", country, "_clean.csv", sep ='')), na.strings =
+                             ".") #} # , separated
+    print(country)}
+  
+  data = fetching_data(data1, country) # only CONFIRMED cases
+  
+  data_f = bind_rows(df_com, data)
+  df_com = data_f
+  }
+
+#missing_gender = sum(is.na(data$patinfo_sex)) #***** checking for missing gender info ******#
+#missing_status = sum(is.na(data$patcourse_status)) #***** checking for missing patient's status info ******#
+  #missing_age = sum(is.na(data$patinfo_ageonset_years)) #***** checking for missing patient's age info ******#
+```
+
+## Table 1 (sample characteristics). ##
+
+**number of total cases** 
+In each strata, total number should be equal to = 51964
+
+```{r}
+nrow(df_com)
+```
+
+**Sex**
+  
+```{r}
+table(df_com$patinfo_sex)
+
+round(100*(table(df_com$patinfo_sex)/nrow(df_com)), 1) # in percentages
+```
+
+**Missing Value in Sex**
+  
+```{r}
+length(which(is.na(df_com$patinfo_sex)))
+```
+
+**Age**
+  
+```{r}
+table(df_com$age_cat)
+round(100*(table(df_com$age_cat)/nrow(df_com)), 1)
+```
+
+**Missing Value in Age**
+  
+```{r}
+length(which(is.na(df_com$age_cat)))
+```
+
+**Clinical outcome**
+  
+```{r}
+table(df_com$patcourse_status)
+```
+
+**Missing Value in Clinical outcome**
+I have counted '8' values with UNKNOWN status in NAs.
+
+```{r}
+(length(which(is.na(df_com$patcourse_status))) + 8)
+round(100*(length(which(is.na(df_com$patcourse_status))) + 8)/nrow(df_com), 1) # fraction of NAs
+```
+
+ALIVE, DEAD, RECOVERED (%)
+
+```{r}
+round(100*(table(df_com$patcourse_status)/nrow(df_com)), 1)
+```
+
+**Country wise **
+  
+```{r}
+table(df_com$country)
+round(100*table(df_com$country)/nrow(df_com), 1)
+```
+
+```{r, include=FALSE}
+com_data = NULL
+lines <- list()
+countries_csv <- list.files("~/publication-children/data") # listing all data files
+countries_names <- str_trim(str_remove(countries_csv, "_clean.csv"), "both") # extracting country names from data files
+
+calculating_case_deaths = function(data) # to compute confirmed cases +
+  #deaths in various age_groups
+{
+  return(data %>%
+           group_by(country, "age groups" = age_cat) %>%
+           summarise(confirmed_cases_each_group = n(),
+                     confirmed_deaths_each_group = sum(death, na.rm = T))
+  )
+}
+
+fetching_data = function(df, country)
+{
+  return(mutate(df, country = str_to_sentence(country), patinfo_ageonset_years = as.double(patinfo_ageonset_years), patcourse_datedeath = as.Date(patcourse_datedeath), report_classif = toupper(as.character(report_classif)), patcourse_status = toupper(as.character(patcourse_status))) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(Lab_resdate), as.Date(report_date) )) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(consultation_dateHF), as.Date(report_date) )) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(Lab_datetaken), as.Date(report_date) )) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(patcourse_dateonset), as.Date(report_date) )) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(patcourse_datedeath), as.Date(report_date) )) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(patcourse_datedischarge), as.Date(report_date) ))%>%
+           mutate(patcourse_status = if_else((patcourse_status=='ALIVE' | patcourse_status== 'RECOVERED') & !is.na(patcourse_datedeath), 'DEAD', patcourse_status)) %>%
+           mutate(patcourse_status = if_else(is.na(patcourse_status) & !is.na(patcourse_datedeath), 'DEAD', patcourse_status)) %>%
+           mutate(patcourse_status = if_else(is.na(patcourse_status) & !is.na(patcourse_datedischarge), 'RECOVERED', patcourse_status)) %>%
+           mutate(report_classif = if_else(is.na(report_classif) & (sum(is.na(report_classif))==nrow(df)), 'CONFIRMED', report_classif)) %>%
+           mutate(death = if_else(patcourse_status=='DEAD', 1, 0))%>%
+           mutate(
+             age_cat = cut(patinfo_ageonset_years, c(-1,4,11,17, 150),
+                           labels=c("0-4", "5-11","12-17", "17+"))) %>%
+           filter(report_date <=lubridate::ymd("2020-09-01") & report_date >=lubridate::ymd("2020-04-01"))%>%
+           filter(report_classif=='CONFIRMED') %>%
+           filter(!is.na(patinfo_sex)) %>% filter(!is.na(patinfo_ageonset_years))) %>%
+    select(country, report_date, patinfo_sex, patinfo_ageonset_years, death,
+           age_cat, report_classif, patcourse_status)
+}
+# Reading the data set
+lines <- list()
+for (country in countries_names){
+  print(country)
+  lines[country] <- readLines(paste("~/publication-children/data/",country, "_clean.csv", sep =''), n = 1)
+  #lines[country] <- readLines(here("child_pub/data_analy", glue('{country}_clean.csv')), n = 1)
+
+  #******* reading the CSVs *********#
+
+  if(grepl(',', lines[country])){
+    print(country)
+    print("1")
+    data1 <- as.data.frame(read.csv(paste("~/publication-children/data/", country, "_clean.csv", sep ='')),na.strings =
+                             ".") # , separated
+    print(country)}
+  else {
+    print(country)
+    print("2")
+    data1 <- as.data.frame(read.csv2(paste("~/publication-children/data/", country, "_clean.csv", sep ='')), na.strings =
+                             ".") #} # , separated
+    print(country)}
+
+  data = fetching_data(data1, country) # only CONFIRMED cases
+
+  #****** CONFIRMED cases + deaths in various age-groups ********#
+
+  data_cd = calculating_case_deaths(data)
+  com_data = rbind.data.frame(com_data, data_cd)
+}
+```
+
+## Table 2. ##
+
+```{r}
+knitr::kable(com_data)
+```
+
+### Figure 1. Trends in 15 countries next to each other ###
+Figure 1.
+
+```{r}
+# script to show the trends in 15 countries, jusr next to ech other
+age_pop1 = as.data.frame(read.csv("~/publication-children/age_pop1.csv"))
+
+fetching_data = function(df, country)
+{
+  return(mutate(df, country = str_to_sentence(country), patinfo_ageonset_years = as.double(patinfo_ageonset_years),
+                #patinfo_ID = as.character(patinfo_ID),
+                patcourse_datedeath = as.Date(patcourse_datedeath), report_classif = toupper(as.character(report_classif)), patcourse_status = toupper(as.character(patcourse_status))) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(Lab_resdate), as.Date(report_date) )) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(consultation_dateHF), as.Date(report_date) )) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(Lab_datetaken), as.Date(report_date) )) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(patcourse_dateonset), as.Date(report_date) )) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(patcourse_datedeath), as.Date(report_date) )) %>%
+           mutate(report_date = if_else(is.na(report_date), as.Date(patcourse_datedischarge), as.Date(report_date) ))%>%
+           mutate(patcourse_status = if_else((patcourse_status=='ALIVE' | patcourse_status== 'RECOVERED') & !is.na(patcourse_datedeath), 'DEAD', patcourse_status)) %>%
+           mutate(patcourse_status = if_else(is.na(patcourse_status) & !is.na(patcourse_datedeath), 'DEAD', patcourse_status)) %>%
+           mutate(patcourse_status = if_else(is.na(patcourse_status) & !is.na(patcourse_datedischarge), 'RECOVERED', patcourse_status)) %>%
+           mutate(report_classif = if_else(is.na(report_classif) & (sum(is.na(report_classif))==nrow(df)), 'CONFIRMED', report_classif)) %>%
+           mutate(death = if_else(patcourse_status=='DEAD', 1, 0))%>%
+           mutate(
+             age_cat = cut(patinfo_ageonset_years, c(-1,4,11,17, 150),
+                           labels=c("0-4", "5-11","12-17", "17+"))) %>%
+           filter(report_date<=lubridate::ymd("2020-09-01") & report_date>=lubridate::ymd("2020-04-01"))%>%
+           filter(report_classif=='CONFIRMED') %>% filter(!is.na(patinfo_ageonset_years)) %>% filter(!is.na(patinfo_sex))) %>%
+    select(country, report_date, patinfo_sex, patinfo_ageonset_years, death, age_cat, report_classif)
+}
+
+lines <- list()
+countries_csv <- list.files("~/publication-children/data")
+countries_names <- str_trim(str_remove(countries_csv, "_clean.csv"), "both")
+
+#age_pop = as.data.frame(read.csv("~/publication-children/age_pop.csv"))
+
+for(country in countries_names){   
+#for(country in countries_names[grepl('Eswat', countries_names)]){
+  print(country)
+  lines[country] <- readLines(paste("~/publication-children/data/",country, "_clean.csv", sep =''), n = 1)
+  
+  if(grepl(',', lines[country])){
+    print(country)
+    print("1")
+    data1 <- as.data.frame(read.csv(paste("~/publication-children/data/", country, "_clean.csv", sep ='')),na.strings =
+                             ".") # , separated
+    print(country)}
+  else {
+    print(country)
+    print("2")
+    data1 <- as.data.frame(read.csv2(paste("~/publication-children/data/", country, "_clean.csv", sep ='')), na.strings =
+                             ".") 
+    print(country)}
+  #print()
+  
+  data = fetching_data(data1, country) # only CONFIRMED cases
+  
+  #colnames = X0.4"      "X5.11"     "X12.17"    "X17." 
+  age_pop_1 = age_pop1$X0.4[age_pop1$Countries==country]
+  age_pop_2 = age_pop1$X5.11[age_pop1$Countries==country]
+  age_pop_3 = age_pop1$X12.17[age_pop1$Countries==country]
+  
+  pop1 = (100000)/(age_pop_1)  # 0-4,
+  pop2 = (100000)/(age_pop_2) # 5-11
+  pop3 =(100000)/(age_pop_3) # 12-17
+  
+  ## epi_curves for different age-categories:
+  epi_per_age1 = data %>% group_by(age_cat, report_date) %>%
+    summarise(Reported_this_day = n()) %>%
+    filter(age_cat=='0-4') %>% 
+    complete(report_date = seq(as.Date('2020-04-01'), as.Date('2020-09-01') , by = "day")) %>%
+    mutate(Reported_this_day = ifelse(is.na(Reported_this_day), 0, Reported_this_day)) %>%
+    mutate(cumulat_cases = cumsum(Reported_this_day)) %>% mutate(Reported_this_day_scaled1 = Reported_this_day*pop1) %>%
+    mutate(cumulat_cases_scaled1 = cumulat_cases*pop1) %>%
+    mutate(sevendayavg_cum1=rollmean(x = cumulat_cases_scaled1, k=7, align = "right",
+                                     fill = NA )) %>%
+    mutate(sevendayavg1=rollmean(x = Reported_this_day_scaled1, k=7, align = "right",
+                                 fill = NA )) # 7-days rolling average of scaled-cases
+  
+  epi_per_age2 = data %>% group_by(age_cat, report_date) %>%
+    summarise(Reported_this_day = n()) %>%
+    filter(age_cat=='5-11') %>% complete(report_date = seq(as.Date('2020-04-01'),
+                                                           as.Date('2020-09-01') , by = "day")) %>%
+    mutate(Reported_this_day = ifelse(is.na(Reported_this_day), 0, Reported_this_day)) %>%
+    mutate(cumulat_cases = cumsum(Reported_this_day)) %>%
+    mutate(Reported_this_day_scaled2 = Reported_this_day*pop2) %>%
+    mutate(cumulat_cases_scaled2 = cumulat_cases*pop2) %>%
+    mutate(sevendayavg_cum2=rollmean(x = cumulat_cases_scaled2, k=7, align = "right",
+                                     fill = NA )) %>%
+    mutate(sevendayavg2=rollmean(x = Reported_this_day_scaled2, k=7, align = "right",
+                                 fill = NA )) # 7-days rolling average of scaled-cases
+  
+  
+  epi_per_age3 = data %>% group_by(age_cat, report_date) %>%
+    summarise(Reported_this_day = n()) %>%
+    filter(age_cat=='12-17') %>% complete(report_date = seq(as.Date('2020-04-01'),
+                                                            as.Date('2020-09-01') , by = "day")) %>%
+    mutate(Reported_this_day = ifelse(is.na(Reported_this_day), 0, Reported_this_day)) %>%
+    mutate(cumulat_cases = cumsum(Reported_this_day)) %>%
+    mutate(Reported_this_day_scaled3 = Reported_this_day*pop3) %>%
+    mutate(cumulat_cases_scaled3 = cumulat_cases*pop3) %>%
+    mutate(sevendayavg_cum3=rollmean(x = cumulat_cases_scaled3, k=7, align = "right",
+                                     fill = NA )) %>%
+    mutate(sevendayavg3=rollmean(x = Reported_this_day_scaled3, k=7, align = "right",
+                                 fill = NA )) # 7-days rolling average of scaled-cases
+  
+  assign(paste("epi_1_", country, sep = ""), epi_per_age1)
+  assign(paste("epi_2_", country, sep = ""), epi_per_age2)
+  assign(paste("epi_3_", country, sep = ""), epi_per_age3)
+  
+  #print(country)
+  
+  comb_plots = epi_per_age1 %>% ggplot() +
+    geom_line(aes(x=report_date, y=(sevendayavg1), col = "blue"), size = 0.8) +
+    geom_line(aes(x=report_date, y=epi_per_age2$sevendayavg2, col = 'red'), size = 0.8, linetype = 'dashed')+
+    geom_line(aes(x=report_date, y=epi_per_age3$sevendayavg3, col = 'brown'), size = 0.8, linetype = 'dotted')+
+    labs(x=" ", y = " ") + 
+    theme(axis.text.x=element_text(size=0.001, angle = 90)) +
+    scale_color_identity(name = "Age groups",
+                         breaks = c("blue", "red", 'brown'),
+                         labels = c("0-4",'5-11','12-17'),
+                         guide = "legend")  +
+    theme_bw() +
+    theme(legend.position = "top",
+          legend.title = element_blank(),
+          legend.text = element_text(size = 10))
+  
+  print(comb_plots)
+  #write.csv(epi_per_age1, paste(country, "1_0_4.csv")) # 0-4
+  #write.csv(epi_per_age2, paste(country, "2_5_11.csv")) # 5-11
+  #write.csv(epi_per_age3, paste(country, "3_12_17.csv")) # 12-17
+}
+
+```
+
+### Children vs adults (combining data from all the 15 countries) 
+Figure 3.
+
+```{r}
+# script used to create children vs adults trendline, combining data from all the countries.
+
+fetching_data_2 = function(df, country)
+{
+  return(mutate(df, country = str_to_sentence(country), patinfo_ageonset_years = as.double(patinfo_ageonset_years),
+                #patinfo_ID = as.character(patinfo_ID), 
+                patcourse_datedeath = as.Date(patcourse_datedeath),
+                report_classif = toupper(as.character(report_classif)), patcourse_status = toupper(as.character(patcourse_status))) %>% 
+           mutate(report_date = if_else(is.na(report_date), as.Date(Lab_resdate), as.Date(report_date) )) %>% 
+           mutate(report_date = if_else(is.na(report_date), as.Date(consultation_dateHF), as.Date(report_date) )) %>% 
+           mutate(report_date = if_else(is.na(report_date), as.Date(Lab_datetaken), as.Date(report_date) )) %>% 
+           mutate(report_date = if_else(is.na(report_date), as.Date(patcourse_dateonset), as.Date(report_date) )) %>% 
+           mutate(report_date = if_else(is.na(report_date), as.Date(patcourse_datedeath), as.Date(report_date) )) %>% 
+           mutate(report_date = if_else(is.na(report_date), as.Date(patcourse_datedischarge), as.Date(report_date) ))%>%
+           mutate(patcourse_status = if_else((patcourse_status=='ALIVE' | patcourse_status== 'RECOVERED') & !is.na(patcourse_datedeath), 'DEAD', patcourse_status)) %>%
+           mutate(patcourse_status = if_else(is.na(patcourse_status) & !is.na(patcourse_datedeath), 'DEAD', patcourse_status)) %>%
+           mutate(patcourse_status = if_else(is.na(patcourse_status) & !is.na(patcourse_datedischarge), 'RECOVERED', patcourse_status)) %>%
+           mutate(report_classif = if_else(is.na(report_classif) & (sum(is.na(report_classif))==nrow(df)), 'CONFIRMED', report_classif)) %>% 
+           mutate(death = if_else(patcourse_status=='DEAD', 1, 0))%>% 
+           mutate(
+             age_cat = cut(patinfo_ageonset_years, c(-1,17, 64, 150), labels=c("children", "adults", 'old'))) %>% 
+           filter(report_date <=ymd("2020-09-01") & report_date >=ymd("2020-04-01"))%>%
+           filter(report_classif=='CONFIRMED') %>% 
+           filter(!is.na(patinfo_ageonset_years)) %>% filter(!is.na(patinfo_sex))) %>%
+    select(country, report_date, patinfo_sex, patinfo_ageonset_years, death, age_cat, report_classif)
+}
+
+lines <- list()
+countries_csv <- list.files("~/publication-children/data")
+countries_names <- str_trim(str_remove(countries_csv, "_clean.csv"), "both")
+
+df_com = NULL
+#for (country in countries_names[grepl('bur', countries_names)]){
+for (country in countries_names){
+  print(country)
+  lines[country] <- readLines(paste("~/publication-children/data/",country, "_clean.csv", sep =''), n = 1)
+  #lines[country] <- readLines(here("child_pub/data_analy", glue('{country}_clean.csv')), n = 1)
+  
+  #******* reading the CSVs *********#
+  
+  if(grepl(',', lines[country])){
+    print(country)
+    print("1")
+    data1 <- as.data.frame(read.csv(paste("~/publication-children/data/", country, "_clean.csv", sep ='')),na.strings =
+                             ".") # , separated
+    print(country)}
+  else {
+    print(country)
+    print("2")
+    data1 <- as.data.frame(read.csv2(paste("~/publication-children/data/", country, "_clean.csv", sep ='')), na.strings =
+                             ".") #} # , separated
+    print(country)}
+  #print()
+  
+  data = fetching_data_2(data1, country) # only CONFIRMED cases 
+  data_f = bind_rows(df_com, data)
+  df_com = data_f
+} 
+data2 = data_f[order(data_f$report_date), ]
+daysinrange <- seq(min(na.omit(data2$report_date)),
+                   max(na.omit(data2$report_date)),
+                   by = "days")
+
+#coveredsundays <- daysinrange[lubridate::wday(daysinrange) == 1]
+coveredsundays <- daysinrange
+# Identify the epiweek that each sunday belongs to
+epiweeks <- lubridate::epiweek(coveredsundays)
+
+# Extract a nicely formatted date for each Epiweek sunday start
+epiweeksundaydate <- format.Date(coveredsundays, format = "%b %d")
+epiweekanddate <- paste("EW", epiweeks, "\n", "(",epiweeksundaydate, ")", sep = "")
+# epiweekanddate is our final output
+# check that all is well with : as.data.frame(coveredsundays,epiweekanddate)
+#data2 = data2 %>% 
+# mutate(EW=epiweeks)
+
+coveredsundays <- rev(coveredsundays)
+epiweekanddate <- rev(epiweekanddate)
+
+coveredsundays2 <- coveredsundays[c(T,F)]
+epiweekanddate2 <- epiweekanddate[c(T,F)]
+
+coveredsundays4 <- coveredsundays[c(T,F,F,F)]
+epiweekanddate4 <- epiweekanddate[c(T,F,F,F)]
+
+coveredsundays5 <- coveredsundays[c(T,F,F,F,F)]
+epiweekanddate5 <- epiweekanddate[c(T,F,F,F,F)]
+
+coveredsundays6 <- coveredsundays[c(T,F,F,F,F,F)]
+epiweekanddate6 <- epiweekanddate[c(T,F,F,F,F,F)]
+
+coveredsundays9 <- coveredsundays[c(T,F,F,F,F,F,F,F,F)]
+epiweekanddate9 <- epiweekanddate[c(T,F,F,F,F,F,F,F,F)]
+
+age_pop4 = sum(age_pop1$X18.64)
+age_pop = sum(age_pop1$total_c) 
+pop4 = (100000)/(age_pop4) # 18-64, adult pop
+pop = (100000)/(age_pop) # '0-17', children pop
+## epi_curves for different age-categories:
+
+# 1. for children 
+epi_per_age = data2 %>% group_by(age_cat, report_date) %>% summarise(Reported_this_day = n()) %>%
+  filter(age_cat=='children') %>% complete(report_date = seq(as.Date('2020-04-01'), as.Date('2020-09-01') , by = "day")) %>%
+  mutate(Reported_this_day = ifelse(is.na(Reported_this_day), 0, Reported_this_day)) %>%
+  mutate(Reported_this_day_scaled = Reported_this_day*pop) %>% # cases, scaled by pop
+  mutate(cumulat_cases = cumsum(Reported_this_day)) %>% # cumulative cases
+  mutate(cumulat_cases_scaled = cumulat_cases*pop) %>% #cumulat cases, scaled by pop
+  mutate(sevendayavg_cum=rollmean(x = cumulat_cases_scaled, k=7, align = "right",
+                                  fill = NA )) %>% # 7-days rolling average of cum. scaled-cases
+  mutate(sevendayavg=rollmean(x = Reported_this_day_scaled, k=7, align = "right",
+                              fill = NA )) # 7-days rolling average of scaled-cases
+
+# 2. for adults
+epi_per_age4 = data2 %>% group_by(age_cat, report_date) %>% summarise(Reported_this_day = n()) %>%
+  filter(age_cat=='adults') %>% complete(report_date = seq(as.Date('2020-04-01'), as.Date('2020-09-01') , by = "day")) %>%
+  mutate(Reported_this_day = ifelse(is.na(Reported_this_day), 0, Reported_this_day)) %>%
+  mutate(Reported_this_day_scaled4 = Reported_this_day*pop4) %>% # cases, scaled by pop
+  mutate(cumulat_cases4 = cumsum(Reported_this_day)) %>% # cumulative cases
+  mutate(cumulat_cases_scaled4 = (cumulat_cases4)*pop4) %>% #cumulat cases, scaled by pop
+  mutate(sevendayavg_cum4=rollmean(x = cumulat_cases_scaled4, k=7, align = "right",
+                                   fill = NA )) %>% # 7-days rolling average of cum. scaled-cases
+  mutate(sevendayavg4=rollmean(x = Reported_this_day_scaled4, k=7, align = "right",
+                               fill = NA )) # 7-days rolling average of scaled-cases
+
+epi_adul = epi_per_age4 %>%
+  mutate(EWs = 
+           as.character(epiweek(report_date))) 
+
+epi_adult_group = epi_adul %>% 
+  select(age_cat, Reported_this_day, Reported_this_day_scaled4, sevendayavg4, EWs) %>% 
+  group_by(EWs) %>% 
+  summarise('Reported_casesAVG_epiweek' = 
+              mean(Reported_this_day, na.rm=T), 
+            'Reported_casesAVG_scaled_epiweek' = 
+              mean(Reported_this_day_scaled4, na.rm=T),
+            '7daysAVG_epiweek' = 
+              mean(sevendayavg4, na.rm=T))
+
+epi_child = epi_per_age %>%
+  mutate(EWs = as.character(epiweek(report_date))) 
+
+epi_child_group = epi_child %>% 
+  select(age_cat, Reported_this_day, Reported_this_day_scaled, sevendayavg, EWs) %>% 
+  group_by(EWs) %>% 
+  summarise('Reported_casesAVG_epiweek' = 
+              mean(Reported_this_day, na.rm=T), 
+            'Reported_casesAVG_scaled_epiweek' = 
+              mean(Reported_this_day_scaled, na.rm=T),
+            '7daysAVG_epiweek' = 
+              mean(sevendayavg, na.rm=T))
+
+#write.csv(epi_child_group, 'children_grouping.csv')
+#write.csv(epi_adult_group, 'adults_grouping.csv')
+
+age_com_2 = epi_per_age %>% ggplot() +
+  geom_line(aes(x=report_date, y=(sevendayavg), col = "blue"), size = 0.8) +
+  geom_line(aes(x=report_date, y=epi_per_age4$sevendayavg4, col = 'red'), size = 0.8, linetype = 'dashed')+
+  labs(x=" ", y = " ") + 
+  theme(axis.text.x=element_text(size=0.001, angle = 90)) +
+  scale_color_identity(name = "Age groups",
+                       breaks = c("blue", "red"),
+                       labels = c("Children", "Adults"),
+                       guide = "legend") +
+  scale_x_date(breaks = coveredsundays6,
+               labels = epiweekanddate6) +
+  theme_bw() +
+  theme(legend.position = "top",
+        legend.title = element_blank(),
+        legend.text = element_text(size = 10))
+age_com_2
+#write.csv(epi_per_age, 'children_cases.csv') 
+#write.csv(epi_per_age4, 'adults_cases.csv')
+
+```
