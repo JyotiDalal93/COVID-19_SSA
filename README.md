@@ -14,7 +14,7 @@ Timokleia Kousi*, Daniela Vivacqua*, **Jyoti Dalal*** et al., *First wave of the
 For more information: https://osf.io/xmqac/
 
 ### Project 3: ###
-**Jyoti Dalal***, Isotta Triulzi*, Ananthu James et al., *COVID-19 Mortality in Women and Men in Sub-Saharan Africa: A Cross Sectional Study (accepted in BMJ Global Health).*
+**Jyoti Dalal***, Isotta Triulzi*, Ananthu James et al., *COVID-19 Mortality in Women and Men in Sub-Saharan Africa: A Cross Sectional Study (ACCEPTED in BMJ Global Health).*
 
 For more information: https://www.medrxiv.org/content/10.1101/2021.07.31.21261422v1
 
@@ -25,3 +25,4 @@ African region (submitted to BMJ Global Health; under review).*
 For more information: https://www.medrxiv.org/content/10.1101/2021.08.21.21262401v1
 
 
+* = joint first-authors
