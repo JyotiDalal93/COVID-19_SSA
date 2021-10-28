@@ -1,5 +1,5 @@
 ---
-title: 'All the R scripts for publication_children'
+title: 'All the R scripts used to make graphs/tables for https://www.sciencedirect.com/science/article/pii/S1201971221006160'
 author: 'Jyoti Dalal'
 output: html_document
 ---
@@ -9,6 +9,9 @@ knitr::opts_chunk$set(message=F, echo = F, warning = F, dpi = 300)
 
 ```
 
+We had ACCESS to the precious individual-level/patient-level data from several member states comprising the WHO African region. Using this data, we tried to get an insight into the impact of COVID-19 among children, in 15 sub-Saharan African nations.
+
+For more information: https://www.sciencedirect.com/science/article/pii/S1201971221006160
 
 ```{r, include=FALSE}
 rm(list = ls())
@@ -98,7 +101,7 @@ p_load(char=c("lattice","ggplot2","highr", "stringr", "markdown",
 
 df_com = NULL
 lines <- list()
-countries_csv <- list.files("~/publication-children/data") # listing all data files
+countries_csv <- list.files("~/publication-children/data") # listing all data files; 
 countries_names <- str_trim(str_remove(countries_csv, "_clean.csv"), "both") # extracting country names from data files
 
 fetching_data = function(df, country)
